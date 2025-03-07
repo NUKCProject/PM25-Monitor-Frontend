@@ -15,6 +15,7 @@ let materials = [];
 let camera, renderer, cube;
 
 onMounted(() => {
+	let previousTime = performance.now();
 	const scene = new THREE.Scene();
 	camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 	renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -65,7 +66,12 @@ onMounted(() => {
 
 	const animate = () => {
 		requestAnimationFrame(animate);
-		if (!isDragging) cube.rotation.y += 0.001;
+
+		const currentTime = performance.now();
+		const deltaTime = (currentTime - previousTime) / 1000; // 秒
+		previousTime = currentTime;
+
+		if (!isDragging) cube.rotation.y += deltaTime * 0.5; // ✅ 每秒旋轉 0.5 弧度
 		renderer.render(scene, camera);
 	};
 	animate();
