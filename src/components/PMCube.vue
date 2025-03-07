@@ -22,8 +22,8 @@ onMounted(() => {
 	threeContainer.value.appendChild(renderer.domElement);
 
 	scene.add(new THREE.AmbientLight(0xffffff, 5));
-	const light = new THREE.DirectionalLight(0xffffff, 3);
-	light.position.set(0, 0, 5);
+	const light = new THREE.DirectionalLight(0xffffff, 10);
+	light.position.set(0, 10, 50);
 	scene.add(light);
 
 	// ✅ 每面獨立材質
@@ -31,7 +31,7 @@ onMounted(() => {
 		new THREE.MeshStandardMaterial({
 			color: 0xffffff,          // 深色金屬
 			metalness: 1,             // 完全金屬
-			roughness: 0.2,           // 微微粗糙，增加反射細節
+			roughness: 0.1,           // 微微粗糙，增加反射細節
 			transparent: true,
 			opacity: 1
 		})
@@ -65,7 +65,7 @@ onMounted(() => {
 
 	const animate = () => {
 		requestAnimationFrame(animate);
-		if (!isDragging) cube.rotation.y += 0.002;
+		if (!isDragging) cube.rotation.y += 0.001;
 		renderer.render(scene, camera);
 	};
 	animate();
@@ -101,13 +101,19 @@ onMounted(() => {
 				texture.center.set(0.5, 0.5);
 				texture.rotation = Math.PI;
 				materials[i].map = texture;
+
+				// ✅ 套用發光效果
+				materials[i].emissive = new THREE.Color(0xffffff); // 白色發光
+				materials[i].emissiveIntensity = 0.1; // 發光強度，可調整
+				materials[i].emissiveMap = texture; // 將文字貼圖當作發光貼圖
 			} else {
-				// ✅ 空白面也加透明貼圖保持材質一致
 				const emptyTexture = createEmptyTexture();
 				materials[i].map = emptyTexture;
+				materials[i].emissiveMap = null; // 清除空白面的發光
 			}
 			materials[i].needsUpdate = true;
 		}
+
 	}
 
 	function createEmptyTexture() {
