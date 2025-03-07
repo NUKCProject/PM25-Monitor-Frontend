@@ -5,7 +5,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
 const threeContainer = ref(null);
@@ -13,7 +12,7 @@ const pmData = ref({});
 let fetchInterval = null;
 let lastUpdate = Date.now();
 let materials = [];
-let camera, renderer;
+let camera, renderer, cube;
 
 onMounted(() => {
 	const scene = new THREE.Scene();
@@ -22,39 +21,51 @@ onMounted(() => {
 	renderer.setSize(window.innerWidth, window.innerHeight);
 	threeContainer.value.appendChild(renderer.domElement);
 
-	scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-	const light = new THREE.DirectionalLight(0xffffff, 0.8);
-	light.position.set(5, 5, 5);
+	scene.add(new THREE.AmbientLight(0xffffff, 5));
+	const light = new THREE.DirectionalLight(0xffffff, 3);
+	light.position.set(0, 0, 5);
 	scene.add(light);
 
-	materials = [
-		new THREE.MeshStandardMaterial({ color: 0x888888, transparent: true, opacity: 0.9 }),
-		new THREE.MeshStandardMaterial({ color: 0x888888, transparent: true, opacity: 0.9 }),
-		new THREE.MeshStandardMaterial({ color: 0x222222 }),
-		new THREE.MeshStandardMaterial({ color: 0x222222 }),
-		new THREE.MeshStandardMaterial({ color: 0x888888, transparent: true, opacity: 0.9 }),
-		new THREE.MeshStandardMaterial({ color: 0x888888, transparent: true, opacity: 0.9 })
-	];
+	// ✅ 每面獨立材質
+	materials = Array.from({ length: 6 }, () =>
+		new THREE.MeshStandardMaterial({
+			color: 0xffffff,          // 深色金屬
+			metalness: 1,             // 完全金屬
+			roughness: 0.2,           // 微微粗糙，增加反射細節
+			transparent: true,
+			opacity: 1
+		})
+	);
 
 	const geometry = new RoundedBoxGeometry(3, 3, 3, 12, 0.3);
-	const cube = new THREE.Mesh(geometry, materials);
+	cube = new THREE.Mesh(geometry, materials);
 	scene.add(cube);
 
 	camera.position.z = 6;
 
-	const controls = new OrbitControls(camera, renderer.domElement);
-	controls.enableDamping = true;
-	controls.dampingFactor = 0.05;
+	let isDragging = false;
+	let previousMousePosition = { x: 0, y: 0 };
 
-	let isUserInteracting = false;
+	renderer.domElement.addEventListener('mousedown', (event) => {
+		isDragging = true;
+		previousMousePosition = { x: event.clientX, y: event.clientY };
+	});
 
-	renderer.domElement.addEventListener('pointerdown', () => isUserInteracting = true);
-	renderer.domElement.addEventListener('pointerup', () => isUserInteracting = false);
+	renderer.domElement.addEventListener('mousemove', (event) => {
+		if (!isDragging) return;
+		const deltaX = event.clientX - previousMousePosition.x;
+		const deltaY = event.clientY - previousMousePosition.y;
+		cube.rotation.y += deltaX * 0.005;
+		cube.rotation.x += deltaY * 0.005;
+		previousMousePosition = { x: event.clientX, y: event.clientY };
+	});
+
+	renderer.domElement.addEventListener('mouseup', () => isDragging = false);
+	renderer.domElement.addEventListener('mouseleave', () => isDragging = false);
 
 	const animate = () => {
 		requestAnimationFrame(animate);
-		if (!isUserInteracting) cube.rotation.y += 0.002;
-		controls.update();
+		if (!isDragging) cube.rotation.y += 0.002;
 		renderer.render(scene, camera);
 	};
 	animate();
@@ -77,22 +88,39 @@ onMounted(() => {
 	}
 
 	function updateCubeText() {
-		const texts = [
-			`CF=1\nPM1.0: ${pmData.value.cf_pm1_0} μg/m³\nPM2.5: ${pmData.value.cf_pm2_5} μg/m³\nPM10: ${pmData.value.cf_pm10} μg/m³`,
-			`ATM\nPM1.0: ${pmData.value.atm_pm1_0} μg/m³\nPM2.5: ${pmData.value.atm_pm2_5} μg/m³\nPM10: ${pmData.value.atm_pm10} μg/m³`,
-			`Particles\n>1.0μm: ${pmData.value.particles_1_0}\n>2.5μm: ${pmData.value.particles_2_5}\n>10μm: ${pmData.value.particles_10}`,
-			new Date().toLocaleTimeString()
-		];
+		const faceTexts = {
+			0: `CF=1\nPM1.0: ${pmData.value.cf_pm1_0} μg/m³\nPM2.5: ${pmData.value.cf_pm2_5} μg/m³\nPM10: ${pmData.value.cf_pm10} μg/m³`,
+			1: `ATM\nPM1.0: ${pmData.value.atm_pm1_0} μg/m³\nPM2.5: ${pmData.value.atm_pm2_5} μg/m³\nPM10: ${pmData.value.atm_pm10} μg/m³`,
+			4: `Particles\n>1.0μm: ${pmData.value.particles_1_0}\n>2.5μm: ${pmData.value.particles_2_5}\n>10μm: ${pmData.value.particles_10}`,
+			5: new Date().toLocaleTimeString()
+		};
 
-		const faces = [0, 1, 4, 5];
-
-		for (let i = 0; i < faces.length; i++) {
-			const texture = createTextTexture(texts[i]);
-			texture.center.set(0.5, 0.5);
-			texture.rotation = Math.PI;
-			materials[faces[i]].map = texture;
-			materials[faces[i]].needsUpdate = true;
+		for (let i = 0; i < materials.length; i++) {
+			if (faceTexts[i]) {
+				const texture = createTextTexture(faceTexts[i]);
+				texture.center.set(0.5, 0.5);
+				texture.rotation = Math.PI;
+				materials[i].map = texture;
+			} else {
+				// ✅ 空白面也加透明貼圖保持材質一致
+				const emptyTexture = createEmptyTexture();
+				materials[i].map = emptyTexture;
+			}
+			materials[i].needsUpdate = true;
 		}
+	}
+
+	function createEmptyTexture() {
+		const canvas = document.createElement('canvas');
+		const context = canvas.getContext('2d');
+		const size = 512;
+		canvas.width = size;
+		canvas.height = size;
+
+		context.fillStyle = '#000000';
+		context.fillRect(0, 0, size, size);
+
+		return new THREE.CanvasTexture(canvas);
 	}
 
 	function showWaitingText() {
@@ -115,12 +143,12 @@ onMounted(() => {
 		context.fillStyle = '#000000';
 		context.fillRect(0, 0, size, size);
 
-		context.font = 'bold 40px Arial';
+		context.font = ' 40px Arial';
 		context.textAlign = 'center';
 		context.textBaseline = 'middle';
 		context.fillStyle = '#FFFFFF';
 		context.shadowColor = '#00FFFF';
-		context.shadowBlur = 30;
+		context.shadowBlur = 10;
 
 		const lines = text.split('\n');
 		const lineHeight = 50;
@@ -133,7 +161,6 @@ onMounted(() => {
 		return new THREE.CanvasTexture(canvas);
 	}
 
-	// RWD 監聽
 	window.addEventListener('resize', onWindowResize);
 
 	function onWindowResize() {
@@ -141,6 +168,39 @@ onMounted(() => {
 		camera.updateProjectionMatrix();
 		renderer.setSize(window.innerWidth, window.innerHeight);
 	}
+	// 滑鼠事件
+	renderer.domElement.addEventListener('mousedown', (event) => {
+		isDragging = true;
+		previousMousePosition = { x: event.clientX, y: event.clientY };
+	});
+	renderer.domElement.addEventListener('mousemove', (event) => {
+		if (!isDragging) return;
+		const deltaX = event.clientX - previousMousePosition.x;
+		const deltaY = event.clientY - previousMousePosition.y;
+		cube.rotation.y += deltaX * 0.005;
+		cube.rotation.x += deltaY * 0.005;
+		previousMousePosition = { x: event.clientX, y: event.clientY };
+	});
+	renderer.domElement.addEventListener('mouseup', () => isDragging = false);
+	renderer.domElement.addEventListener('mouseleave', () => isDragging = false);
+
+	// ✅ 手機觸控事件
+	renderer.domElement.addEventListener('touchstart', (event) => {
+		isDragging = true;
+		const touch = event.touches[0];
+		previousMousePosition = { x: touch.clientX, y: touch.clientY };
+	});
+	renderer.domElement.addEventListener('touchmove', (event) => {
+		if (!isDragging) return;
+		const touch = event.touches[0];
+		const deltaX = touch.clientX - previousMousePosition.x;
+		const deltaY = touch.clientY - previousMousePosition.y;
+		cube.rotation.y += deltaX * 0.005;
+		cube.rotation.x += deltaY * 0.005;
+		previousMousePosition = { x: touch.clientX, y: touch.clientY };
+	});
+	renderer.domElement.addEventListener('touchend', () => isDragging = false);
+	renderer.domElement.addEventListener('touchcancel', () => isDragging = false);
 });
 
 onUnmounted(() => {
