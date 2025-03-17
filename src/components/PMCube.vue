@@ -17,15 +17,36 @@ let isDragging = false;
 let previousMousePosition = { x: 0, y: 0 };
 let previousTime = performance.now();
 
+/**
+ * Initializes the Three.js scene.
+ *
+ * This function creates a new Three.js scene, sets up the camera and renderer
+ * objects, and adds the renderer's DOM element to the page.
+ *
+ * @return {THREE.Scene} The initialized scene.
+ */
+
 function initScene() {
+	// build the scene
 	const scene = new THREE.Scene();
+	// build the camera (fov aspect near/far )
 	camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+	// 
 	renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 	renderer.setSize(window.innerWidth, window.innerHeight);
 	threeContainer.value.appendChild(renderer.domElement);
 	return scene;
 }
 
+/**
+ * Initializes the Three.js lights.
+ *
+ * This function adds two lights to the Three.js scene. The first is a global
+ * ambient light with a low intensity, while the second is a high-intensity
+ * directional light pointing down at the cube.
+ *
+ * @param {THREE.Scene} scene The scene to add the lights to.
+ */
 function initLights(scene) {
 	scene.add(new THREE.AmbientLight(0xffffff, 5));
 	const light = new THREE.DirectionalLight(0xffffff, 10);
@@ -33,6 +54,16 @@ function initLights(scene) {
 	scene.add(light);
 }
 
+/**
+ * Initializes the cube.
+ *
+ * This function creates a new cube with the specified dimensions using
+ * the RoundedBoxGeometry class. It then creates six MeshStandardMaterial
+ * objects and assigns them to the cube's material array. Finally, it adds
+ * the cube to the scene and positions the camera to view the cube.
+ *
+ * @param {THREE.Scene} scene The scene to add the cube to.
+ */
 function initCube(scene) {
 	materials = Array.from({ length: 6 }, () =>
 		new THREE.MeshStandardMaterial({
@@ -50,6 +81,13 @@ function initCube(scene) {
 	camera.position.z = 6;
 }
 
+/**
+ * Initializes the mouse and touch event listeners for the cube.
+ *
+ * This function adds event listeners to the renderer's DOM element to handle
+ * mouse and touch events. It tracks when the user is dragging the cube and
+ * updates the cube's rotation accordingly.
+ */
 function initControls() {
 	renderer.domElement.addEventListener('mousedown', (event) => {
 		isDragging = true;
@@ -66,7 +104,6 @@ function initControls() {
 	renderer.domElement.addEventListener('mouseup', () => isDragging = false);
 	renderer.domElement.addEventListener('mouseleave', () => isDragging = false);
 
-	// ✅ 手機觸控事件
 	renderer.domElement.addEventListener('touchstart', (event) => {
 		isDragging = true;
 		const touch = event.touches[0];
@@ -85,6 +122,15 @@ function initControls() {
 	renderer.domElement.addEventListener('touchcancel', () => isDragging = false);
 }
 
+/**
+ * Animates the cube by rendering it every frame and incrementing its rotation
+ * when the user is not dragging it.
+ *
+ * This function is called by the Three.js requestAnimationFrame function and
+ * updates the cube's rotation every frame. When the user is not dragging the
+ * cube, the cube's rotation is incremented at a rate of 0.5 degrees per second.
+ * The cube is then rendered with the camera.
+ */
 function animate() {
 	requestAnimationFrame(animate);
 
@@ -96,6 +142,13 @@ function animate() {
 	renderer.render(cube.parent, camera);
 }
 
+/**
+ * Fetches the latest PM data from the server and updates the cube text.
+ *
+ * This function fetches the latest PM data from the server using the Fetch
+ * API. It then updates the cube text by calling updateCubeText(). If the
+ * fetch fails, it calls showWaitingText() to display a waiting message.
+ */
 function fetchPMData() {
 	fetch('https://aiot-451916.de.r.appspot.com/latest-pm')
 		.then(res => res.json())
@@ -106,6 +159,17 @@ function fetchPMData() {
 		})
 		.catch(() => showWaitingText());
 }
+
+/**
+ * Updates the text displayed on each face of the cube.
+ *
+ * This function creates text textures for specific faces of the cube
+ * based on the latest particulate matter (PM) data. It applies these
+ * textures to the corresponding materials of the cube's faces. If no
+ * text is specified for a face, it applies an empty texture. The function
+ * also sets the emissive properties for the materials to give a subtle
+ * glow effect.
+ */
 
 function updateCubeText() {
 	const faceTexts = {
@@ -132,6 +196,17 @@ function updateCubeText() {
 	}
 }
 
+/**
+ * Creates an empty texture with a solid black background.
+ *
+ * This function initializes a canvas element and sets its dimensions
+ * to 512x512 pixels. It fills the entire canvas with a black color,
+ * creating a blank texture. The resulting texture is then converted
+ * into a THREE.CanvasTexture object for use in Three.js materials.
+ *
+ * @return {THREE.CanvasTexture} A texture filled with a black color.
+ */
+
 function createEmptyTexture() {
 	const canvas = document.createElement('canvas');
 	const context = canvas.getContext('2d');
@@ -142,6 +217,21 @@ function createEmptyTexture() {
 	context.fillRect(0, 0, size, size);
 	return new THREE.CanvasTexture(canvas);
 }
+
+/**
+ * Creates a text texture from the given string.
+ *
+ * This function initializes a canvas element and sets its dimensions
+ * to 512x512 pixels. It fills the canvas with a black background and
+ * draws each line of the input text centered on the canvas, using a
+ * white font with a cyan shadow effect. The text is split by new lines
+ * and rendered with a specific line height to ensure proper spacing.
+ * The resulting texture is then converted into a THREE.CanvasTexture
+ * object for use in Three.js materials.
+ *
+ * @param {string} text - The text to render onto the texture.
+ * @return {THREE.CanvasTexture} A texture containing the rendered text.
+ */
 
 function createTextTexture(text) {
 	const canvas = document.createElement('canvas');
